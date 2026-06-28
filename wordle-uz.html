@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>So'zcha — O'zbekcha Wordle</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f14;
+    --surface: #1a1a24;
+    --border: #2e2e42;
+    --correct: #4ade80;
+    --present: #facc15;
+    --absent: #3a3a50;
+    --text: #f0f0f8;
+    --muted: #6b6b8a;
+    --accent: #818cf8;
+    --accent-glow: rgba(129,140,248,0.25);
+    --key-bg: #2a2a3c;
+    --key-text: #d0d0e8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* HEADER */
+  header {
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+  .header-actions { display: flex; gap: 10px; }
+  .icon-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+
+  /* STATS BAR */
+  .stats-bar {
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .stat-item { display: flex; align-items: center; gap: 6px; }
+  .stat-num {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .stat-divider { color: var(--border); }
+
+  /* GRID */
+  .grid-wrap {
+    padding: 20px 16px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .grid-row {
+    display: flex;
+    gap: 6px;
+  }
+  .cell {
+    width: 62px; height: 62px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: border-color 0.15s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+  .cell.filled { border-color: var(--accent); }
+  .cell.pop { animation: pop 0.1s ease; }
+  .cell.flip { animation: flip 0.5s ease forwards; }
+  .cell.shake { animation: shake 0.4s ease; }
+  .cell.correct { background: var(--correct); border-color: var(--correct); color: #0f0f14; }
+  .cell.present { background: var(--present); border-color: var(--present); color: #0f0f14; }
+  .cell.absent  { background: var(--absent);  border-color: var(--absent);  color: var(--muted); }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+  @keyframes flip {
+    0%   { transform: rotateX(0deg); }
+    50%  { transform: rotateX(90deg); }
+    100% { transform: rotateX(0deg); }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+  @keyframes bounce {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  .cell.win-bounce { animation: bounce 0.5s ease; }
+
+  /* MESSAGE */
+  .message-wrap {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .message {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .message.show { opacity: 1; }
+
+  /* KEYBOARD */
+  .keyboard {
+    width: 100%;
+    max-width: 520px;
+    padding: 10px 8px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .kb-row {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+  }
+  .key {
+    height: 56px;
+    min-width: 34px;
+    padding: 0 5px;
+    background: var(--key-bg);
+    color: var(--key-text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+    user-select: none;
+    text-transform: uppercase;
+  }
+  .key:active { transform: scale(0.93); }
+  .key.wide { min-width: 52px; font-size: 0.6rem; }
+  .key.correct { background: var(--correct); color: #0f0f14; border-color: var(--correct); }
+  .key.present { background: var(--present); color: #0f0f14; border-color: var(--present); }
+  .key.absent  { background: var(--absent);  color: var(--muted);  border-color: var(--absent); }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px 24px;
+    max-width: 340px;
+    width: 90%;
+    transform: translateY(20px);
+    transition: transform 0.25s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal h2 {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 900;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .modal h2 span { color: var(--accent); }
+
+  /* Stats modal */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .stat-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 6px;
+    text-align: center;
+  }
+  .stat-box .num {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--accent);
+  }
+  .stat-box .lbl {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.3;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .dist-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .dist-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 0.8rem;
+  }
+  .dist-row .d-num {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    width: 12px;
+    text-align: right;
+    color: var(--muted);
+  }
+  .dist-bar-wrap { flex: 1; background: var(--bg); border-radius: 4px; height: 22px; overflow: hidden; }
+  .dist-bar {
+    height: 100%;
+    background: var(--key-bg);
+    border-radius: 4px;
+    display: flex; align-items: center;
+    padding: 0 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--muted);
+    min-width: 28px;
+    transition: width 0.5s ease;
+  }
+  .dist-bar.highlight { background: var(--accent); color: #0f0f14; }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary { background: var(--accent); color: #0f0f14; }
+  .btn-secondary { background: var(--key-bg); color: var(--text); border: 1px solid var(--border); }
+
+  /* Result word reveal */
+  .result-word {
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .result-word strong {
+    font-family: 'Unbounded', sans-serif;
+    color: var(--correct);
+    font-size: 1.1rem;
+  }
+
+  /* Help modal */
+  .help-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  .mini-cell {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border: 2px solid var(--border);
+    color: var(--muted);
+  }
+  .mini-cell.c { background: var(--correct); border-color: var(--correct); color: #0f0f14; }
+  .mini-cell.p { background: var(--present); border-color: var(--present); color: #0f0f14; }
+  .mini-cell.a { background: var(--absent);  border-color: var(--absent);  color: var(--muted); }
+  .help-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+  .help-desc strong { color: var(--text); }
+
+  /* Share copied toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent);
+    color: #0f0f14;
+    padding: 10px 22px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 200;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 400px) {
+    .cell { width: 52px; height: 52px; font-size: 1.1rem; }
+    .key { height: 48px; min-width: 28px; font-size: 0.62rem; }
+    .key.wide { min-width: 44px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">So'z<span>cha</span></div>
+  <div class="header-actions">
+    <button class="icon-btn" onclick="openHelp()" title="Qoida">❓</button>
+    <button class="icon-btn" onclick="openStats()" title="Statistika">📊</button>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-item"><span class="stat-num" id="sb-played">0</span> O'yin</div>
+  <span class="stat-divider">·</span>
+  <div class="stat-item"><span class="stat-num" id="sb-streak">0</span> Ketma-ket</div>
+  <span class="stat-divider">·</span>
+  <div class="stat-item"><span class="stat-num" id="sb-winpct">0</span>% Yutish</div>
+</div>
+
+<div class="grid-wrap" id="grid"></div>
+
+<div class="message-wrap">
+  <div class="message" id="msg"></div>
+</div>
+
+<div class="keyboard" id="keyboard"></div>
+
+<!-- Help Modal -->
+<div class="modal-overlay" id="helpModal">
+  <div class="modal">
+    <h2>Qanday <span>o'ynash</span>?</h2>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:18px;line-height:1.6">
+      6 urinishda 5 harfli so'zni top. Har urinishdan so'ng ranglar yordam beradi.
+    </p>
+
+    <div class="help-row">
+      <div class="mini-cell c">K</div>
+      <div class="mini-cell">I</div>
+      <div class="mini-cell">T</div>
+      <div class="mini-cell">O</div>
+      <div class="mini-cell">B</div>
+      <div class="help-desc"><strong style="color:var(--correct)">Yashil</strong> — to'g'ri harf, to'g'ri joy</div>
+    </div>
+    <div class="help-row">
+      <div class="mini-cell">O</div>
+      <div class="mini-cell p">S</div>
+      <div class="mini-cell">M</div>
+      <div class="mini-cell">O</div>
+      <div class="mini-cell">N</div>
+      <div class="help-desc"><strong style="color:var(--present)">Sariq</strong> — harf bor, lekin boshqa joy</div>
+    </div>
+    <div class="help-row">
+      <div class="mini-cell">D</div>
+      <div class="mini-cell">A</div>
+      <div class="mini-cell">R</div>
+      <div class="mini-cell a">X</div>
+      <div class="mini-cell">T</div>
+      <div class="help-desc"><strong style="color:var(--muted)">Kulrang</strong> — bu harf yo'q</div>
+    </div>
+
+    <button class="btn btn-primary" onclick="closeHelp()">Tushunarli!</button>
+  </div>
+</div>
+
+<!-- Stats Modal -->
+<div class="modal-overlay" id="statsModal">
+  <div class="modal">
+    <h2><span>Statistika</span></h2>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num" id="s-played">0</div><div class="lbl">O'yin</div></div>
+      <div class="stat-box"><div class="num" id="s-win">0%</div><div class="lbl">Yutish</div></div>
+      <div class="stat-box"><div class="num" id="s-streak">0</div><div class="lbl">Joriy seriya</div></div>
+      <div class="stat-box"><div class="num" id="s-maxstreak">0</div><div class="lbl">Eng uzun</div></div>
+    </div>
+    <div class="dist-label">Taxmin taqsimoti</div>
+    <div id="dist"></div>
+    <div id="result-reveal"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeStats()">Yopish</button>
+      <button class="btn btn-primary" onclick="shareResult()">📤 Ulashish</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── WORD LIST ───────────────────────────────────────────────────────────────
+const WORDS = [
+  "kitob","osmon","daraxt","bulut","togʻ","daryo","koʻcha","shahar",
+  "qishloq","toshkent","olma","nok","uzum","limon","anor","shaftoli",
+  "bozor","maktab","stol","kursi","deraza","eshik","devor","poliz",
+  "bogʻ","gullar","chaman","oʻtlar","bahor","kuzgi","qishki","yozgi",
+  "koʻzgu","yorugʻ","qorongʻi","shamol","yomgʻir","qorlar","muzlar",
+  "dengiz","sahro","oʻrmon","togʻlar","vodiy","qishloq","qasr",
+  "koʻprik","temir","toshlar","kumush","oltin","bronza","shisha",
+  "qogʻoz","qalem","daftar","kitoblar","doska","sinf","oʻqituvchi",
+  "oʻquvchi","bolalik","yoshlik","keksalik","oʻtmish","kelajak",
+  "bugun","ertaga","kecha","hafta","oylar","yillar","asrlar",
+  "minutes","soniya","soatlar","tun","kunduz","tonglar","shom",
+  "nonvoy","novvot","qozon","piyola","choynak","tarelka","qoshiq",
+  "vilka","pichoq","sabzi","piyoz","kartoshka","bodring","pomidor",
+  "qoʻzi","buzoq","echki","sigir","ot","toychoq","qoʻtir",
+  "mushuk","itlar","qushlar","baliq","qurt","hashorat",
+  "hospital","doktor","shifoxona","dori","kasalxona","malham",
+  "masjid","madrasat","cherkovi","ibodatxona","minora","gumbaz",
+  "konsert","teatr","kino","muzey","galereya","kutubxona",
+  "kompyuter","telefon","internet","dastur","ilovalar","ekran",
+  "mashina","velosiped","avtobus","poyezd","samolyot","kema",
+  "atlas","tarix","adabiyot","matematika","fizika","kimyo",
+  "musiqa","rasm","haykal","arxitektura","dizayn","sanʼat",
+  "futbol","basketbol","tennis","suzish","yugurish","sakrash",
+  "doʻstlar","oila","ota","ona","aka","uka","opa","singil",
+  "buva","buvi","amaki","xola","togʻa","amma","qarindosh",
+  "sevgi","baxt","quvonch","shodlik","kulgu","tabassum",
+  "yulduz","sayyora","quyosh","oylar","galaktika","koinot",
+  "rang","qizil","sariq","yashil","koʻk","binafsha","toʻq",
+  "nozik","yoʻgʻon","uzun","qisqa","baland","past","keng",
+  "tinch","shovqin","sovuq","issiq","salqin","iliq","jazirama"
+];
+
+// Filter to exactly 5 chars (after removing ʻ and ʼ for length count)
+// Actually let's use clean 5-letter words
+const CLEAN_WORDS = [
+  "kitob","osmon","daraxt","bulut","togʻ", // some are not 5
+];
+
+// Use a curated list of proper 5-letter Uzbek words
+const WORD_LIST = [
+  "kitob","osmon","chana","bahor","kuzgi","yozda","qishda","dengiz",
+  "bogʻda","gullar","chaman","shahar","bozor","maktab","kursi",
+  "deraza","eshik","devor","koʻcha","toʻsin","oltin","kumush",
+  "toshlar","daryo","koʻprik","qasr","vodiy","oʻrmon","sahro",
+  "yulduz","quyosh","sayyora","koinot","galaktika",
+  "qizil","sariq","yashil","binafsha",
+  "sevgi","baxt","quvonch","shodlik","kulgu","tabassum",
+  "doʻst","oila","buva","buvi","amaki","xola","togʻa",
+  "atlas","tarix","adabiyot","matematika","fizika","kimyo",
+  "musiqa","rasm","haykal","sanʼat","dizayn",
+  "futbol","tennis","suzish","yugurish","sakrash",
+  "mashina","poyezd","samolyot","kema","avtobus","velosiped",
+  "kompyuter","telefon","internet","dastur","ekran",
+  "masjid","minora","gumbaz","teatr","kino","muzey",
+  "nonvoy","novvot","qozon","piyola","choynak","tarelka",
+  "sabzi","piyoz","bodring","pomidor","limon","anor","shaftoli",
+  "mushuk","baliq","qushlar","toychoq",
+  "doktor","dori","kasalxona","malham","shifoxona",
+  "nozik","uzun","qisqa","baland","keng","tinch",
+  "sovuq","issiq","salqin","iliq",
+  "bugun","ertaga","kecha","hafta","yillar","asrlar",
+  "tunda","kunduz","tongda","shomda",
+  // Simple clean 5-letter words
+  "arzon","qimmat","chiroyli","koʻhna","yangi","eski","katta","kichik",
+  "tezda","sekin","toʻgʻri","egri","oldin","keyin","ichki","tashqi"
+].filter(w => {
+  // Count letters ignoring ʻ and ʼ
+  const clean = w.replace(/[ʻʼ']/g, "'");
+  return clean.length === 5 || w.replace(/[ʻʼ]/g, "").length === 5;
+});
+
+// Final curated 5-letter list (no ambiguous special chars issues)
+const FINAL_WORDS = [
+  "arzon","katta","yangi","eski","oldin","keyin","ichki","sekin",
+  "tezda","chana","bahor","bozor","gullar","daryo","yulduz","quyosh",
+  "sevgi","baxt","doʻst","buva","buvi","atlas","musiqa","rasm",
+  "tennis","kema","ekran","kino","muzey","sabzi","piyoz","limon",
+  "anor","mushuk","baliq","dori","nozik","uzun","keng","tinch",
+  "sovuq","issiq","salqin","iliq","bugun","kecha","hafta","tunda",
+  "kitob","osmon","bogʻ","koʻcha","shahar","maktab","kursi","eshik","devor",
+  "oltin","qasr","vodiy","sahro","qizil","sariq","yashil","oila",
+  "tarix","fizika","kimyo","futbol","suzish","sakrash","poyezd","samolyot",
+  "velosiped","telefon","internet","dastur","masjid","minora","teatr",
+  "nonvoy","qozon","piyola","choynak","tarelka","bodring","pomidor",
+  "shaftoli","qushlar","toychoq","malham","haykal","sanʼat","dizayn",
+  "quvonch","shodlik","kulgu","tabassum","amaki","xola","togʻa",
+  "hayot","dunyo","vatan","millat","til","adab","ilm","fan",
+  "inson","ruhlar","tanlar","qalb","aql","fikr","orzu","umid",
+  "mehr","shafqat","adolat","haqiqat","ezgulik","yaxshilik",
+  "tabiat","havolar","suv","olov","tuproq","tosh","yer",
+  "zamon","makon","joy","sharoit","muhit","oʻrin"
+];
+
+// Pick only 5-letter words (based on display length, treating special chars as 1)
+function wordLen(w) {
+  return [...w].filter(c => c !== 'ʻ' && c !== 'ʼ').length;
+}
+
+const VALID_WORDS = FINAL_WORDS.filter(w => {
+  const letters = w.replace(/[ʻʼ]/g, '').split('');
+  return letters.length === 5;
+});
+
+// Ensure we have enough words, fallback
+const GAME_WORDS = VALID_WORDS.length >= 20 ? VALID_WORDS : [
+  "kitob","osmon","bogʻda","daryo","yulduz","sevgi","baxt","oila","buva","atlas",
+  "musiqa","rasm","tennis","kema","ekran","kino","muzey","sabzi","piyoz","limon",
+  "mushuk","baliq","dori","nozik","uzun","keng","tinch","sovuq","issiq","salqin",
+  "bugun","kecha","hafta","tunda","hayot","dunyo","vatan","millat","qalb","fikr",
+  "orzu","umid","mehr","adolat","tabiat","suv","olov","tosh","zamon","makon"
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let stats = loadStats();
+let gameState = loadGame();
+
+function loadStats() {
+  try {
+    return JSON.parse(localStorage.getItem('sozcha_stats')) || newStats();
+  } catch { return newStats(); }
+}
+function newStats() {
+  return { played: 0, won: 0, streak: 0, maxStreak: 0, dist: [0,0,0,0,0,0] };
+}
+function saveStats() {
+  localStorage.setItem('sozcha_stats', JSON.stringify(stats));
+}
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function getDailyWord() {
+  const d = new Date();
+  const epoch = new Date(2024, 0, 1);
+  const day = Math.floor((d - epoch) / 86400000);
+  return GAME_WORDS[day % GAME_WORDS.length].toUpperCase();
+}
+
+function loadGame() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('sozcha_game'));
+    if (saved && saved.dateKey === todayKey()) return saved;
+  } catch {}
+  return {
+    dateKey: todayKey(),
+    word: getDailyWord(),
+    guesses: [],
+    currentGuess: '',
+    status: 'playing' // playing | won | lost
+  };
+}
+function saveGame() {
+  localStorage.setItem('sozcha_game', JSON.stringify(gameState));
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+const ROWS = 6, COLS = 5;
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) {
+    const row = document.createElement('div');
+    row.className = 'grid-row';
+    row.id = `row-${r}`;
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = `cell-${r}-${c}`;
+      row.appendChild(cell);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function renderGuesses() {
+  for (let r = 0; r < gameState.guesses.length; r++) {
+    const guess = gameState.guesses[r];
+    const colors = colorGuess(guess, gameState.word);
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      cell.textContent = guess[c];
+      cell.className = `cell ${colors[c]}`;
+    }
+  }
+  // Show current input
+  const r = gameState.guesses.length;
+  if (gameState.status === 'playing') {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      cell.textContent = gameState.currentGuess[c] || '';
+      cell.className = gameState.currentGuess[c] ? 'cell filled' : 'cell';
+    }
+  }
+}
+
+function colorGuess(guess, word) {
+  const result = Array(COLS).fill('absent');
+  const wordArr = word.split('');
+  const guessArr = guess.split('');
+  const used = Array(COLS).fill(false);
+
+  // Correct
+  for (let i = 0; i < COLS; i++) {
+    if (guessArr[i] === wordArr[i]) {
+      result[i] = 'correct';
+      used[i] = true;
+    }
+  }
+  // Present
+  for (let i = 0; i < COLS; i++) {
+    if (result[i] === 'correct') continue;
+    for (let j = 0; j < COLS; j++) {
+      if (!used[j] && guessArr[i] === wordArr[j]) {
+        result[i] = 'present';
+        used[j] = true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// ─── KEYBOARD ────────────────────────────────────────────────────────────────
+const KB_ROWS = [
+  ["Q","W","E","R","T","Y","U","I","O","P"],
+  ["A","S","D","F","G","H","J","K","L"],
+  ["⌫","Z","X","C","V","B","N","M","↵"]
+];
+// O'zbek harflari qo'shimcha
+const UZ_EXTRA = ["OʻOʻ","Gʻ","SH","CH","NG"];
+
+function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  KB_ROWS.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'kb-row';
+    row.forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'key' + (k === '⌫' || k === '↵' ? ' wide' : '');
+      btn.textContent = k;
+      btn.dataset.key = k;
+      btn.onclick = () => handleKey(k);
+      rowEl.appendChild(btn);
+    });
+    kb.appendChild(rowEl);
+  });
+}
+
+function updateKeyColors() {
+  const colorMap = {};
+  for (const guess of gameState.guesses) {
+    const colors = colorGuess(guess, gameState.word);
+    for (let i = 0; i < COLS; i++) {
+      const letter = guess[i];
+      const existing = colorMap[letter];
+      if (!existing || (existing === 'absent' && colors[i] !== 'absent') ||
+          (existing === 'present' && colors[i] === 'correct')) {
+        colorMap[letter] = colors[i];
+      }
+    }
+  }
+  document.querySelectorAll('.key').forEach(btn => {
+    const k = btn.dataset.key;
+    if (colorMap[k]) {
+      btn.className = `key ${k.length > 1 && k !== '⌫' && k !== '↵' ? 'wide ' : ''}${colorMap[k]}`;
+    }
+  });
+}
+
+// ─── INPUT ───────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  if (e.key === 'Enter') handleKey('↵');
+  else if (e.key === 'Backspace') handleKey('⌫');
+  else if (/^[a-zA-Z]$/.test(e.key)) handleKey(e.key.toUpperCase());
+});
+
+function handleKey(k) {
+  if (gameState.status !== 'playing') return;
+  if (k === '⌫') {
+    gameState.currentGuess = gameState.currentGuess.slice(0, -1);
+    renderGuesses();
+  } else if (k === '↵') {
+    submitGuess();
+  } else if (gameState.currentGuess.length < COLS && /^[A-ZʻʼOGSCN]/.test(k)) {
+    gameState.currentGuess += k;
+    const r = gameState.guesses.length;
+    const c = gameState.currentGuess.length - 1;
+    const cell = document.getElementById(`cell-${r}-${c}`);
+    cell.classList.add('pop');
+    setTimeout(() => cell.classList.remove('pop'), 150);
+    renderGuesses();
+  }
+  saveGame();
+}
+
+function submitGuess() {
+  const guess = gameState.currentGuess.toUpperCase();
+  if (guess.length < COLS) {
+    showMessage("So'z " + COLS + " harfdan iborat bo'lishi kerak!");
+    shakeRow(gameState.guesses.length);
+    return;
+  }
+
+  const r = gameState.guesses.length;
+  gameState.guesses.push(guess);
+  gameState.currentGuess = '';
+
+  // Animate flip
+  const colors = colorGuess(guess, gameState.word);
+  for (let c = 0; c < COLS; c++) {
+    const cell = document.getElementById(`cell-${r}-${c}`);
+    setTimeout(() => {
+      cell.classList.add('flip');
+      setTimeout(() => {
+        cell.textContent = guess[c];
+        cell.className = `cell ${colors[c]}`;
+      }, 250);
+    }, c * 100);
+  }
+
+  setTimeout(() => {
+    updateKeyColors();
+    if (guess === gameState.word) {
+      gameState.status = 'won';
+      stats.played++;
+      stats.won++;
+      stats.streak++;
+      if (stats.streak > stats.maxStreak) stats.maxStreak = stats.streak;
+      stats.dist[r] = (stats.dist[r] || 0) + 1;
+      saveStats();
+      saveGame();
+      updateStatsBar();
+
+      // Win bounce
+      setTimeout(() => {
+        for (let c = 0; c < COLS; c++) {
+          setTimeout(() => {
+            document.getElementById(`cell-${r}-${c}`).classList.add('win-bounce');
+          }, c * 80);
+        }
+      }, 200);
+
+      const msgs = ["Ajoyib! 🎉","Zo'r! 🔥","Ustavoy! 👏","Brilliant! 💎","Sha'bg'irt! 🌟","A'lo! ✨"];
+      showMessage(msgs[r] || "Zo'r!");
+      setTimeout(() => openStats(), 2000);
+    } else if (gameState.guesses.length >= ROWS) {
+      gameState.status = 'lost';
+      stats.played++;
+      stats.streak = 0;
+      saveStats();
+      saveGame();
+      updateStatsBar();
+      showMessage(`Javob: ${gameState.word}`);
+      setTimeout(() => openStats(), 2500);
+    }
+    saveGame();
+  }, COLS * 100 + 300);
+}
+
+function shakeRow(r) {
+  const row = document.getElementById(`row-${r}`);
+  row.querySelectorAll('.cell').forEach(c => {
+    c.classList.add('shake');
+    setTimeout(() => c.classList.remove('shake'), 400);
+  });
+}
+
+// ─── MESSAGE ─────────────────────────────────────────────────────────────────
+let msgTimer;
+function showMessage(text, duration = 2200) {
+  const msg = document.getElementById('msg');
+  msg.textContent = text;
+  msg.classList.add('show');
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => msg.classList.remove('show'), duration);
+}
+
+// ─── STATS BAR ───────────────────────────────────────────────────────────────
+function updateStatsBar() {
+  document.getElementById('sb-played').textContent = stats.played;
+  document.getElementById('sb-streak').textContent = stats.streak;
+  const pct = stats.played ? Math.round(stats.won / stats.played * 100) : 0;
+  document.getElementById('sb-winpct').textContent = pct;
+}
+
+// ─── MODALS ──────────────────────────────────────────────────────────────────
+function openHelp()  { document.getElementById('helpModal').classList.add('open'); }
+function closeHelp() { document.getElementById('helpModal').classList.remove('open'); }
+function openStats() {
+  // Fill stats
+  document.getElementById('s-played').textContent = stats.played;
+  const pct = stats.played ? Math.round(stats.won / stats.played * 100) : 0;
+  document.getElementById('s-win').textContent = pct + '%';
+  document.getElementById('s-streak').textContent = stats.streak;
+  document.getElementById('s-maxstreak').textContent = stats.maxStreak;
+
+  // Distribution
+  const distEl = document.getElementById('dist');
+  distEl.innerHTML = '';
+  const maxDist = Math.max(...stats.dist, 1);
+  stats.dist.forEach((v, i) => {
+    const pct = Math.max(v / maxDist * 100, 8);
+    const isLast = gameState.status === 'won' && gameState.guesses.length === i + 1;
+    distEl.innerHTML += `
+      <div class="dist-row">
+        <div class="d-num">${i+1}</div>
+        <div class="dist-bar-wrap">
+          <div class="dist-bar ${isLast ? 'highlight' : ''}" style="width:${pct}%">${v}</div>
+        </div>
+      </div>`;
+  });
+
+  // Result reveal
+  const rr = document.getElementById('result-reveal');
+  if (gameState.status !== 'playing') {
+    rr.innerHTML = `<div class="result-word" style="margin-top:16px">
+      Bugungi so'z: <strong>${gameState.word}</strong>
+    </div>`;
+  } else {
+    rr.innerHTML = '';
+  }
+
+  document.getElementById('statsModal').classList.add('open');
+}
+function closeStats() { document.getElementById('statsModal').classList.remove('open'); }
+
+// Close modals on overlay click
+document.getElementById('helpModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeHelp();
+});
+document.getElementById('statsModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeStats();
+});
+
+// ─── SHARE ───────────────────────────────────────────────────────────────────
+function shareResult() {
+  if (gameState.status === 'playing') {
+    showMessage("O'yin tugamagan!");
+    return;
+  }
+  const rows = gameState.guesses.map(guess => {
+    return colorGuess(guess, gameState.word).map(c =>
+      c === 'correct' ? '🟩' : c === 'present' ? '🟨' : '⬜'
+    ).join('');
+  }).join('\n');
+
+  const result = gameState.status === 'won'
+    ? `${gameState.guesses.length}/${ROWS}`
+    : 'X/' + ROWS;
+
+  const text = `So'zcha — O'zbekcha Wordle\n${result}\n\n${rows}`;
+
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Nusxa olindi! 📋');
+    });
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+buildGrid();
+buildKeyboard();
+renderGuesses();
+updateKeyColors();
+updateStatsBar();
+
+// Show help on first visit
+if (!localStorage.getItem('sozcha_visited')) {
+  localStorage.setItem('sozcha_visited', '1');
+  setTimeout(openHelp, 500);
+}
+
+// If game already ended, show stats
+if (gameState.status !== 'playing') {
+  const endMsg = gameState.status === 'won' ? '🎉 Siz yutdingiz!' : `Javob: ${gameState.word}`;
+  showMessage(endMsg, 3000);
+}
+</script>
+</body>
+</html>
